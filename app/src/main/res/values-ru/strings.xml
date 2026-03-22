@@ -79,6 +79,9 @@
     <string name="language_body">Выберите язык приложения. По умолчанию используется русский.</string>
     <string name="opensource_title">Open source</string>
     <string name="opensource_body">NutVault — это open source локальный менеджер паролей под лицензией MIT. В приложении нет рекламы, аналитики и монетизации. Официальные версии и обновления доступны только в github.com/Deadsquirrel93/nut-vault.</string>
+    <string name="official_updates_title">Официальные обновления</string>
+    <string name="official_updates_body">Официальные APK-файлы NutVault и будущие обновления публикуются только в этом GitHub-репозитории.</string>
+    <string name="open_github_releases">Открыть GitHub Releases</string>
     <string name="language_russian">Русский</string>
     <string name="language_english">English</string>
     <string name="transfer_title">Перенос хранилища</string>

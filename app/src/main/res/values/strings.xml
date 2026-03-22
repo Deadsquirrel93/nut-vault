@@ -79,6 +79,9 @@
     <string name="language_body">Choose the app language. Russian is enabled by default.</string>
     <string name="opensource_title">Open source</string>
     <string name="opensource_body">NutVault is an open source local password manager under the MIT license. No ads, no analytics, and no monetization are built into the app. Official versions and updates are available only from github.com/Deadsquirrel93/nut-vault.</string>
+    <string name="official_updates_title">Official updates</string>
+    <string name="official_updates_body">Official NutVault APK files and future updates are published only in this GitHub repository.</string>
+    <string name="open_github_releases">Open GitHub releases</string>
     <string name="language_russian">Русский</string>
     <string name="language_english">English</string>
     <string name="transfer_title">Transfer vault</string>

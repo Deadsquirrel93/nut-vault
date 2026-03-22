@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
@@ -51,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -74,6 +76,7 @@ fun SettingsScreen(
     val languageCode by viewModel.languageCode.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val activity = context.findActivity()
     var login by remember { mutableStateOf("") }
     var masterPassword by remember { mutableStateOf("") }
@@ -278,6 +281,18 @@ fun SettingsScreen(
                 SettingsCard(icon = { Icon(Icons.Default.Info, contentDescription = null) }) {
                     Text(stringResource(R.string.opensource_title), style = MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.opensource_body))
+                }
+
+                SettingsCard(icon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) }) {
+                    Text(stringResource(R.string.official_updates_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.official_updates_body))
+                    Button(
+                        onClick = { uriHandler.openUri("https://github.com/Deadsquirrel93/nut-vault/releases/latest") },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
+                        Text(stringResource(R.string.open_github_releases), modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
 
                 SettingsCard(icon = { Icon(Icons.Default.FileDownload, contentDescription = null) }) {
