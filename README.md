@@ -2,6 +2,8 @@
 
 NutVault is a local-first Android password manager for a single user. It stores folders and credentials only on the device, works without a backend, does not use cloud sync, and is designed for everyday personal use with a clean Jetpack Compose interface.
 
+NutVault is published as an open source project. It does not include ads, tracking, analytics, subscriptions, or built-in monetization.
+
 ## What NutVault Does
 
 NutVault lets you:
@@ -20,6 +22,8 @@ NutVault lets you:
 ## Product Highlights
 
 - Offline by design: no backend, no sync, no network dependency
+- Open source and transparent: intended to be published publicly on GitHub
+- No ads, no analytics, no subscriptions, no in-app monetization
 - One-user secure flow: first launch requires registration of the local master account
 - Local encryption: sensitive credential fields are stored encrypted on device
 - Modern Android stack: Kotlin, Jetpack Compose, Room, Material 3
@@ -140,5 +144,8 @@ NutVault is intentionally scoped for one person on one device at a time:
 - no server API
 - no password recovery flow
 - no internet sync
+- no ads
+- no analytics
+- no monetization
 
 That keeps the product small, private, and predictable.

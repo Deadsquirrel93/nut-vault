@@ -77,6 +77,8 @@
     <string name="unlock_with_biometric">Разблокировка по биометрии</string>
     <string name="language_title">Язык</string>
     <string name="language_body">Выберите язык приложения. По умолчанию используется русский.</string>
+    <string name="opensource_title">Open source</string>
+    <string name="opensource_body">NutVault — это open source локальный менеджер паролей. В приложении нет рекламы, аналитики и монетизации.</string>
     <string name="language_russian">Русский</string>
     <string name="language_english">English</string>
     <string name="transfer_title">Перенос хранилища</string>

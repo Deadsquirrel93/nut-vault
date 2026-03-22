@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
@@ -272,6 +273,11 @@ fun SettingsScreen(
                             label = { Text(stringResource(R.string.language_english)) },
                         )
                     }
+                }
+
+                SettingsCard(icon = { Icon(Icons.Default.Info, contentDescription = null) }) {
+                    Text(stringResource(R.string.opensource_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.opensource_body))
                 }
 
                 SettingsCard(icon = { Icon(Icons.Default.FileDownload, contentDescription = null) }) {

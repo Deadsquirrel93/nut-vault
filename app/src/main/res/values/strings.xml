@@ -77,6 +77,8 @@
     <string name="unlock_with_biometric">Unlock with biometric</string>
     <string name="language_title">Language</string>
     <string name="language_body">Choose the app language. Russian is enabled by default.</string>
+    <string name="opensource_title">Open source</string>
+    <string name="opensource_body">NutVault is an open source local password manager. No ads, no analytics, and no monetization are built into the app.</string>
     <string name="language_russian">Русский</string>
     <string name="language_english">English</string>
     <string name="transfer_title">Transfer vault</string>
