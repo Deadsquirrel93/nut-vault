@@ -4,6 +4,12 @@ NutVault is a local-first Android password manager for a single user. It stores 
 
 NutVault is published as an open source project. It does not include ads, tracking, analytics, subscriptions, or built-in monetization.
 
+License: `MIT`
+
+Official source: [github.com/Deadsquirrel93/nut-vault](https://github.com/Deadsquirrel93/nut-vault)
+
+Official NutVault builds and updates are distributed only through this repository. If an APK or update comes from any other source, it should not be treated as an official release.
+
 ## What NutVault Does
 
 NutVault lets you:
@@ -24,6 +30,7 @@ NutVault lets you:
 - Offline by design: no backend, no sync, no network dependency
 - Open source and transparent: intended to be published publicly on GitHub
 - No ads, no analytics, no subscriptions, no in-app monetization
+- Official distribution only from this repository and its GitHub Releases
 - One-user secure flow: first launch requires registration of the local master account
 - Local encryption: sensitive credential fields are stored encrypted on device
 - Modern Android stack: Kotlin, Jetpack Compose, Room, Material 3
@@ -134,6 +141,18 @@ Debug APK output:
 ```bash
 ./gradlew testDebugUnitTest
 ```
+
+## Official Distribution
+
+The only official source for NutVault code, APK files, and updates is:
+
+- [https://github.com/Deadsquirrel93/nut-vault](https://github.com/Deadsquirrel93/nut-vault)
+
+If you install a build from another website, Telegram channel, mirror, or repackaged APK source, it is not an official NutVault release.
+
+## License
+
+This project is released under the `MIT` license.
 
 ## Current Product Scope
 
