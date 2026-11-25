@@ -1,170 +1,42 @@
 # NutVault
 
-NutVault is a local-first Android password manager for a single user. It stores folders and credentials only on the device, works without a backend, does not use cloud sync, and is designed for everyday personal use with a clean Jetpack Compose interface.
+NutVault is a local-first Android password manager for a single user. It stores folders, credentials, notes, and 2FA TOTP secrets encrypted on the device, works completely offline without any network permission, and uses a clean Material 3 Jetpack Compose interface.
 
-NutVault is published as an open source project. It does not include ads, tracking, analytics, subscriptions, or built-in monetization.
+NutVault is open source under the `MIT` license. No ads, no tracking, no analytics, no cloud sync, no monetization.
 
-License: `MIT`
-
-Official source: [github.com/Deadsquirrel93/nut-vault](https://github.com/Deadsquirrel93/nut-vault)
-
-Official NutVault builds and updates are distributed only through this repository. If an APK or update comes from any other source, it should not be treated as an official release.
-
-## What NutVault Does
-
-NutVault lets you:
-
-- create, edit, move, and delete credentials
-- group credentials into folders or keep them in the root vault
-- copy title, URL, login, and password independently
-- hide and reveal passwords on demand
-- generate strong passwords with configurable rules
-- evaluate password strength while typing or generating
-- lock the app with a master login and master password
-- unlock with biometrics when enabled
-- export the vault into an encrypted `.vault` file
-- import an encrypted vault file and restore folders and credentials
-
-## Product Highlights
-
-- Offline by design: no backend, no sync, no network dependency
-- Open source and transparent: intended to be published publicly on GitHub
-- No ads, no analytics, no subscriptions, no in-app monetization
-- Official distribution only from this repository and its GitHub Releases
-- One-user secure flow: first launch requires registration of the local master account
-- Local encryption: sensitive credential fields are stored encrypted on device
-- Modern Android stack: Kotlin, Jetpack Compose, Room, Material 3
-- Practical security controls: Android Keystore, BiometricPrompt, clipboard cleanup, app autolock, protected screens
-- Minimal interface: fast access to folders, credentials, search, generator, and settings
-
-## Security Model
-
-NutVault is built around a local-only security model:
-
-- master password is not stored in plain text
-- master password is stored as a salted PBKDF2-HMAC-SHA256 hash
-- credential secrets are stored encrypted with device-backed cryptography
-- biometric unlock is used only as an unlock method, not as the primary source of truth
-- exported vault files are encrypted and protected by a separate export passphrase
-- the app does not send secrets over the network
+Official source & releases: [github.com/Deadsquirrel93/nut-vault](https://github.com/Deadsquirrel93/nut-vault)
 
 ## Main Features
 
-### Credentials
-
-Each credential can contain:
-
-- title
-- URL
-- login
-- password
-
-Supported actions:
-
-- create and edit
-- move between folders
-- delete with confirmation
-- copy any field separately
-- reveal or hide password without changing stored value
-
-### Folders
-
-- create folders
-- rename folders
-- delete folders with destructive confirmation
-- open a folder and browse its credentials
-- keep credentials inside folders or in the root vault
-
-### Search
-
-- search across all credentials from the home screen
-- search inside a specific folder
-
-### Password Generator
-
-- choose length
-- include or exclude uppercase, lowercase, digits, and symbols
-- regenerate instantly
-- apply generated password directly to the credential form
-- see password strength immediately
-
-### Authentication
-
-- mandatory initial registration on first launch
-- login with master login and master password
-- optional biometric unlock
-- immediate biometric offer after registration
-- biometric prompt can open automatically on login when enabled
-
-### Import and Export
-
-- encrypted `.vault` export
-- encrypted import with replacement confirmation
-- handling for invalid or incompatible vault files
+- **Encrypted local vault** — titles, URLs, logins, passwords, notes, and 2FA secrets encrypted via Android Keystore (AES-256-GCM)
+- **Master password + Biometric unlock** — salted PBKDF2-HMAC-SHA256 (210,000 iterations), rate-limited lockout, safe biometric key invalidation handling
+- **Configurable auto-lock** — Immediately, 30s, 1m, or 5m after leaving the app
+- **Offline 2FA (TOTP)** — supports Base32 secrets and `otpauth://` URIs with live countdown and 1-tap copy
+- **Android Autofill Service** — fill saved credentials in browsers and apps with biometric/master unlock
+- **Password Health** — detects weak and reused passwords with an overall vault score
+- **Password Generator** — instant preview, configurable rules, persisted preferences, standalone access from Home
+- **Favorites, folders, search & sorting** — 1-tap copy login/password directly from the list
+- **Protected clipboard** — marks sensitive values (`EXTRA_IS_SENSITIVE`) and auto-clears after 30 seconds
+- **Encrypted `.vault` backup** — AES-256-GCM + PBKDF2 export/import with Merge and Replace modes (backward-compatible with v1.0.0 backups)
+- **Light, dark & system themes** — plus optional Material You dynamic colors on Android 12+
+- **Offline updates** — links to GitHub Releases and Obtainium without requesting `INTERNET` permission
 
 ## Tech Stack
 
-- Kotlin
-- Jetpack Compose
-- Material 3
-- Room
-- Android Keystore
-- BiometricPrompt
-- MVVM-style state management with repositories and use cases
+- Kotlin 2.4, Jetpack Compose, Material 3 (Edge-to-Edge)
+- Room 2.8 (KSP, exported schemas, non-destructive migrations)
+- Android Keystore, BiometricPrompt, Android AutofillService
+- R8 minification & resource shrinking
 
-## Project Structure
-
-- `app/src/main/java/com/example/passwordvault/app` — app container and root app state
-- `app/src/main/java/com/example/passwordvault/core` — auth, crypto, localization, password tooling
-- `app/src/main/java/com/example/passwordvault/data` — Room database, entities, DAOs, repository implementations
-- `app/src/main/java/com/example/passwordvault/domain` — models, repository contracts, use cases
-- `app/src/main/java/com/example/passwordvault/ui` — Compose screens, components, navigation, view models
-
-## Build Requirements
-
-- Android Studio with current Android SDK
-- JDK 17
-- Android SDK configured locally
-
-## Build and Run
-
-```bash
-./gradlew assembleDebug
-```
-
-Debug APK output:
-
-`app/build/outputs/apk/debug/app-debug.apk`
-
-## Tests
+## Build & Test
 
 ```bash
 ./gradlew testDebugUnitTest
+./gradlew assembleRelease
 ```
 
-## Official Distribution
-
-The only official source for NutVault code, APK files, and updates is:
-
-- [https://github.com/Deadsquirrel93/nut-vault](https://github.com/Deadsquirrel93/nut-vault)
-
-If you install a build from another website, Telegram channel, mirror, or repackaged APK source, it is not an official NutVault release.
+Release APK output: `app/build/outputs/apk/release/app-release.apk`
 
 ## License
 
-This project is released under the `MIT` license.
-
-## Current Product Scope
-
-NutVault is intentionally scoped for one person on one device at a time:
-
-- no multi-user support
-- no cloud backup
-- no server API
-- no password recovery flow
-- no internet sync
-- no ads
-- no analytics
-- no monetization
-
-That keeps the product small, private, and predictable.
+`MIT` — see [LICENSE](LICENSE).

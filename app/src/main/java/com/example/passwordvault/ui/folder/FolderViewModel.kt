@@ -3,6 +3,7 @@ package com.example.passwordvault.ui.folder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.passwordvault.R
+import com.example.passwordvault.core.clipboard.ClipboardHelper
 import com.example.passwordvault.core.ui.UiText
 import com.example.passwordvault.domain.model.CredentialSummary
 import com.example.passwordvault.domain.model.FolderSummary
@@ -31,6 +32,7 @@ class FolderViewModel(
     folderId: Long,
     private val vaultRepository: VaultRepository,
     private val saveFolderUseCase: SaveFolderUseCase,
+    private val clipboardHelper: ClipboardHelper,
 ) : ViewModel() {
     private val searchQuery = MutableStateFlow("")
 
@@ -66,6 +68,22 @@ class FolderViewModel(
 
     fun updateSearchQuery(value: String) {
         searchQuery.value = value
+    }
+
+    fun copyLogin(credentialId: Long, label: String) {
+        viewModelScope.launch {
+            val record = vaultRepository.getCredentialRecord(credentialId) ?: return@launch
+            clipboardHelper.copy(label = label, value = record.login, isSensitive = false)
+            messages.emit(UiText.StringResource(R.string.login_copied))
+        }
+    }
+
+    fun copyPassword(credentialId: Long, label: String) {
+        viewModelScope.launch {
+            val record = vaultRepository.getCredentialRecord(credentialId) ?: return@launch
+            clipboardHelper.copy(label = label, value = record.password, isSensitive = true)
+            messages.emit(UiText.StringResource(R.string.password_copied))
+        }
     }
 
     fun renameFolder(folderId: Long, name: String) {

@@ -1,8 +1,11 @@
 package com.example.passwordvault.core.password
 
+import com.example.passwordvault.domain.model.CredentialRecord
 import com.example.passwordvault.domain.model.PasswordGeneratorOptions
+import com.example.passwordvault.domain.model.PasswordHealthReport
 import com.example.passwordvault.domain.model.PasswordStrength
 import com.example.passwordvault.domain.model.PasswordStrengthScore
+import com.example.passwordvault.domain.model.ReusedPasswordGroup
 import java.security.SecureRandom
 import kotlin.math.log2
 
@@ -94,5 +97,53 @@ class PasswordStrengthEvaluator {
             }
         }
         return penalty
+    }
+}
+
+class PasswordHealthAnalyzer(
+    private val evaluator: PasswordStrengthEvaluator = PasswordStrengthEvaluator(),
+) {
+    fun analyze(credentials: List<CredentialRecord>): PasswordHealthReport {
+        if (credentials.isEmpty()) {
+            return PasswordHealthReport(
+                totalCount = 0,
+                scorePercent = 100,
+                weakCredentials = emptyList(),
+                mediumCredentials = emptyList(),
+                reusedGroups = emptyList(),
+                totpEnabledCount = 0,
+            )
+        }
+
+        val scored = credentials.map { it to evaluator.evaluate(it.password) }
+        val weak = scored.filter { it.second.strength == PasswordStrength.WEAK }.map { it.first }
+        val medium = scored.filter { it.second.strength == PasswordStrength.MEDIUM }.map { it.first }
+        val reusedGroups = credentials
+            .filter { it.password.isNotBlank() }
+            .groupBy { it.password }
+            .values
+            .filter { it.size > 1 }
+            .sortedByDescending { it.size }
+            .map { ReusedPasswordGroup(credentials = it) }
+
+        val reusedIds = reusedGroups.flatMap { it.credentials }.map { it.id }.toSet()
+        val points = scored.sumOf { (cred, score) ->
+            val base = when (score.strength) {
+                PasswordStrength.WEAK -> 20
+                PasswordStrength.MEDIUM -> 65
+                PasswordStrength.STRONG -> 92
+                PasswordStrength.VERY_STRONG -> 100
+            }
+            if (cred.id in reusedIds) (base - 30).coerceAtLeast(10) else base
+        }
+
+        return PasswordHealthReport(
+            totalCount = credentials.size,
+            scorePercent = (points / credentials.size).coerceIn(0, 100),
+            weakCredentials = weak,
+            mediumCredentials = medium,
+            reusedGroups = reusedGroups,
+            totpEnabledCount = credentials.count { !it.totpSecret.isNullOrBlank() },
+        )
     }
 }

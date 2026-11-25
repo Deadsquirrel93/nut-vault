@@ -15,6 +15,8 @@ data class CredentialSummary(
     val title: String,
     val url: String?,
     val login: String,
+    val isFavorite: Boolean = false,
+    val hasTotp: Boolean = false,
     val updatedAt: Long,
 )
 
@@ -25,6 +27,9 @@ data class CredentialRecord(
     val url: String?,
     val login: String,
     val password: String,
+    val notes: String? = null,
+    val totpSecret: String? = null,
+    val isFavorite: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 )
@@ -36,6 +41,9 @@ data class CredentialInput(
     val url: String?,
     val login: String,
     val password: String,
+    val notes: String? = null,
+    val totpSecret: String? = null,
+    val isFavorite: Boolean = false,
 )
 
 data class AuthSettings(
@@ -63,13 +71,29 @@ data class PasswordStrengthScore(
     val entropyBits: Int,
 )
 
+data class ReusedPasswordGroup(
+    val credentials: List<CredentialRecord>,
+)
+
+data class PasswordHealthReport(
+    val totalCount: Int,
+    val scorePercent: Int,
+    val weakCredentials: List<CredentialRecord>,
+    val mediumCredentials: List<CredentialRecord>,
+    val reusedGroups: List<ReusedPasswordGroup>,
+    val totpEnabledCount: Int,
+)
+
 data class PasswordGeneratorOptions(
     val length: Int = 20,
     val includeUppercase: Boolean = true,
     val includeLowercase: Boolean = true,
     val includeDigits: Boolean = true,
     val includeSymbols: Boolean = true,
-)
+) {
+    val activeGroupCount: Int
+        get() = listOf(includeUppercase, includeLowercase, includeDigits, includeSymbols).count { it }
+}
 
 data class ExportFolder(
     val externalId: Long,
@@ -85,6 +109,9 @@ data class ExportCredential(
     val url: String?,
     val login: String,
     val password: String,
+    val notes: String? = null,
+    val totpSecret: String? = null,
+    val isFavorite: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 )
@@ -92,6 +119,17 @@ data class ExportCredential(
 data class VaultSnapshot(
     val folders: List<ExportFolder>,
     val credentials: List<ExportCredential>,
+)
+
+enum class ImportMode {
+    REPLACE,
+    MERGE,
+}
+
+data class ImportSummary(
+    val addedFolders: Int,
+    val addedCredentials: Int,
+    val skippedDuplicates: Int,
 )
 
 data class LoginResult(

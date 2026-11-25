@@ -12,32 +12,49 @@ class LocaleManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("locale_settings", Context.MODE_PRIVATE)
 
-    private val _languageCode = MutableStateFlow(DEFAULT_LANGUAGE)
-    val languageCode: StateFlow<String> = _languageCode.asStateFlow()
+    private val _languageCode = MutableStateFlow<String?>(readCurrentLanguage())
+    val languageCode: StateFlow<String?> = _languageCode.asStateFlow()
 
     init {
         val stored = prefs.getString(KEY_LANGUAGE_CODE, null)
-        val languageCode = stored ?: DEFAULT_LANGUAGE
-        applyLanguage(languageCode, persist = stored == null)
+        if (stored != null && stored != SYSTEM_SENTINEL) {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(stored))
+        }
+        refresh()
     }
 
-    fun setLanguage(languageCode: String) {
-        applyLanguage(languageCode, persist = true)
+    fun refresh() {
+        _languageCode.value = readCurrentLanguage()
     }
 
-    private fun applyLanguage(languageCode: String, persist: Boolean) {
+    fun setLanguage(languageCode: String?) {
         _languageCode.value = languageCode
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageCode))
-        if (persist) {
+        if (languageCode == null) {
+            prefs.edit().putString(KEY_LANGUAGE_CODE, SYSTEM_SENTINEL).apply()
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+        } else {
             prefs.edit().putString(KEY_LANGUAGE_CODE, languageCode).apply()
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageCode))
+        }
+    }
+
+    private fun readCurrentLanguage(): String? {
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        if (!appLocales.isEmpty) {
+            return appLocales[0]?.language
+        }
+        val stored = prefs.getString(KEY_LANGUAGE_CODE, null)
+        return when (stored) {
+            null, SYSTEM_SENTINEL -> null
+            else -> stored
         }
     }
 
     companion object {
-        const val DEFAULT_LANGUAGE = "ru"
         const val ENGLISH = "en"
         const val RUSSIAN = "ru"
 
         private const val KEY_LANGUAGE_CODE = "language_code"
+        private const val SYSTEM_SENTINEL = "system"
     }
 }

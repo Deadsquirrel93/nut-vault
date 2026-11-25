@@ -4,11 +4,16 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.passwordvault.R
+import com.example.passwordvault.core.auth.BiometricCipherProvider
 import com.example.passwordvault.core.auth.SessionManager
 import com.example.passwordvault.core.localization.LocaleManager
+import com.example.passwordvault.core.preferences.AppPreferences
+import com.example.passwordvault.core.preferences.AutoLockTimeout
+import com.example.passwordvault.core.preferences.ThemeMode
 import com.example.passwordvault.core.ui.UiText
 import com.example.passwordvault.domain.model.AuthSettings
 import com.example.passwordvault.domain.model.ChangePasswordResult
+import com.example.passwordvault.domain.model.ImportMode
 import com.example.passwordvault.domain.repository.AuthRepository
 import com.example.passwordvault.domain.repository.VaultRepository
 import com.example.passwordvault.domain.usecase.ChangeMasterPasswordUseCase
@@ -30,15 +35,24 @@ class SettingsViewModel(
     private val importVaultUseCase: ImportVaultUseCase,
     private val sessionManager: SessionManager,
     private val localeManager: LocaleManager,
+    private val appPreferences: AppPreferences,
+    private val biometricCipherProvider: BiometricCipherProvider,
 ) : ViewModel() {
     val settings: StateFlow<AuthSettings> = authRepository.observeSettings().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = AuthSettings(),
     )
-    val languageCode: StateFlow<String> = localeManager.languageCode
+    val languageCode: StateFlow<String?> = localeManager.languageCode
+    val themeMode: StateFlow<ThemeMode> = appPreferences.themeMode
+    val dynamicColor: StateFlow<Boolean> = appPreferences.dynamicColor
+    val autoLockTimeout: StateFlow<AutoLockTimeout> = appPreferences.autoLockTimeout
 
     val messages = MutableSharedFlow<UiText>()
+
+    fun refreshLocale() {
+        localeManager.refresh()
+    }
 
     fun enableProtection(login: String, password: String, confirmPassword: String) {
         viewModelScope.launch {
@@ -74,10 +88,23 @@ class SettingsViewModel(
         }
     }
 
+    fun reportBiometricEnableFailed() {
+        viewModelScope.launch {
+            messages.emit(UiText.StringResource(R.string.biometric_unlock_enable_failed))
+        }
+    }
+
+    fun reportBiometricUnavailable() {
+        viewModelScope.launch {
+            messages.emit(UiText.StringResource(R.string.biometric_unavailable_message))
+        }
+    }
+
     fun changeMasterPassword(
         currentPassword: String,
         newPassword: String,
         confirmNewPassword: String,
+        onSuccess: () -> Unit = {},
     ) {
         viewModelScope.launch {
             runCatching {
@@ -88,7 +115,10 @@ class SettingsViewModel(
                 changeMasterPasswordUseCase(currentPassword, newPassword)
             }.onSuccess { result ->
                 val resId = when (result) {
-                    ChangePasswordResult.SUCCESS -> R.string.master_password_changed
+                    ChangePasswordResult.SUCCESS -> {
+                        onSuccess()
+                        R.string.master_password_changed
+                    }
                     ChangePasswordResult.INVALID_CURRENT_PASSWORD -> R.string.current_password_incorrect
                     ChangePasswordResult.PROTECTION_NOT_ENABLED -> R.string.master_password_change_failed
                 }
@@ -108,6 +138,7 @@ class SettingsViewModel(
 
     fun disableBiometric() {
         viewModelScope.launch {
+            biometricCipherProvider.deleteKey()
             runCatching { authRepository.disableBiometric() }
                 .onSuccess { messages.emit(UiText.StringResource(R.string.biometric_unlock_disabled)) }
                 .onFailure { messages.emit(UiText.StringResource(R.string.biometric_unlock_disable_failed)) }
@@ -126,14 +157,26 @@ class SettingsViewModel(
         }
     }
 
-    fun importVault(uri: Uri, passphrase: String) {
+    fun importVault(uri: Uri, passphrase: String, mode: ImportMode) {
         viewModelScope.launch {
             if (passphrase.length < 8) {
                 messages.emit(UiText.StringResource(R.string.import_passphrase_min_length))
                 return@launch
             }
-            runCatching { importVaultUseCase(uri, passphrase) }
-                .onSuccess { messages.emit(UiText.StringResource(R.string.import_saved)) }
+            runCatching { importVaultUseCase(uri, passphrase, mode) }
+                .onSuccess { summary ->
+                    val text = when (mode) {
+                        ImportMode.REPLACE -> UiText.StringResource(
+                            R.string.import_saved_replace,
+                            listOf(summary.addedCredentials),
+                        )
+                        ImportMode.MERGE -> UiText.StringResource(
+                            R.string.import_saved_merge,
+                            listOf(summary.addedCredentials, summary.skippedDuplicates),
+                        )
+                    }
+                    messages.emit(text)
+                }
                 .onFailure { messages.emit(UiText.StringResource(R.string.import_failed)) }
         }
     }
@@ -154,8 +197,20 @@ class SettingsViewModel(
         }
     }
 
-    fun setLanguage(languageCode: String) {
+    fun setLanguage(languageCode: String?) {
         localeManager.setLanguage(languageCode)
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        appPreferences.setThemeMode(mode)
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        appPreferences.setDynamicColor(enabled)
+    }
+
+    fun setAutoLockTimeout(timeout: AutoLockTimeout) {
+        appPreferences.setAutoLockTimeout(timeout)
     }
 
     fun lockApp() {

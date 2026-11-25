@@ -1,13 +1,22 @@
 package com.example.passwordvault.core.auth
 
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.content.Context
 import android.os.Build
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.biometric.BiometricManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
+import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -15,9 +24,6 @@ import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 class PasswordHasher(
     private val secureRandom: SecureRandom = SecureRandom(),
@@ -33,20 +39,68 @@ class PasswordHasher(
         val hash = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
         return Base64.encodeToString(hash, Base64.NO_WRAP)
     }
+
+    fun verify(
+        password: String,
+        saltBase64: String,
+        iterations: Int,
+        expectedHashBase64: String,
+    ): Boolean {
+        val calculated = hash(password, saltBase64, iterations)
+        return MessageDigest.isEqual(
+            calculated.toByteArray(StandardCharsets.UTF_8),
+            expectedHashBase64.toByteArray(StandardCharsets.UTF_8),
+        )
+    }
 }
 
-class SessionManager {
+class SessionManager(
+    private val clockMillis: () -> Long = System::currentTimeMillis,
+) {
     private val _isUnlocked = MutableStateFlow(false)
     val isUnlocked: StateFlow<Boolean> = _isUnlocked.asStateFlow()
     private val _shouldOfferBiometricEnrollment = MutableStateFlow(false)
     val shouldOfferBiometricEnrollment: StateFlow<Boolean> = _shouldOfferBiometricEnrollment.asStateFlow()
 
+    private var backgroundedAtMillis: Long? = null
+    private var pendingLockJob: Job? = null
+
     fun unlock() {
+        pendingLockJob?.cancel()
+        pendingLockJob = null
+        backgroundedAtMillis = null
         _isUnlocked.value = true
     }
 
     fun lock() {
+        pendingLockJob?.cancel()
+        pendingLockJob = null
+        backgroundedAtMillis = null
         _isUnlocked.value = false
+    }
+
+    fun onAppBackgrounded(timeoutMillis: Long, scope: CoroutineScope) {
+        if (!_isUnlocked.value) return
+        if (timeoutMillis <= 0L) {
+            lock()
+            return
+        }
+        backgroundedAtMillis = clockMillis()
+        pendingLockJob?.cancel()
+        pendingLockJob = scope.launch {
+            delay(timeoutMillis)
+            lock()
+        }
+    }
+
+    fun onAppForegrounded(timeoutMillis: Long) {
+        pendingLockJob?.cancel()
+        pendingLockJob = null
+        val backgroundedAt = backgroundedAtMillis ?: return
+        backgroundedAtMillis = null
+        if (_isUnlocked.value && (clockMillis() - backgroundedAt) >= timeoutMillis) {
+            _isUnlocked.value = false
+        }
     }
 
     fun requestBiometricEnrollmentOffer() {
@@ -59,23 +113,36 @@ class SessionManager {
 }
 
 class BiometricCipherProvider {
+    // Keep alias unchanged for compatibility with existing enrolled users.
     private val alias = "password_vault_biometric_unlock"
     private val keyStoreProvider = "AndroidKeyStore"
 
-    fun createEncryptionCipher(): Cipher {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-        return cipher
+    fun createEncryptionCipher(): Result<Cipher> = runCatching {
+        try {
+            initEncryptionCipher()
+        } catch (error: KeyPermanentlyInvalidatedException) {
+            deleteKey()
+            initEncryptionCipher()
+        }
     }
 
-    fun createDecryptionCipher(ivBase64: String): Cipher {
+    fun createDecryptionCipher(ivBase64: String): Result<Cipher> = runCatching {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(
             Cipher.DECRYPT_MODE,
-            getOrCreateKey(),
+            getExistingKey() ?: throw KeyPermanentlyInvalidatedException(),
             GCMParameterSpec(128, Base64.decode(ivBase64, Base64.NO_WRAP)),
         )
-        return cipher
+        cipher
+    }
+
+    fun deleteKey() {
+        runCatching {
+            val keyStore = KeyStore.getInstance(keyStoreProvider).apply { load(null) }
+            if (keyStore.containsAlias(alias)) {
+                keyStore.deleteEntry(alias)
+            }
+        }
     }
 
     fun biometricAvailability(context: Context): Int {
@@ -87,10 +154,19 @@ class BiometricCipherProvider {
     fun verifierPlaintext(): ByteArray = "password-vault-biometric-verifier"
         .toByteArray(StandardCharsets.UTF_8)
 
-    private fun getOrCreateKey(): SecretKey {
+    private fun initEncryptionCipher(): Cipher {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        return cipher
+    }
+
+    private fun getExistingKey(): SecretKey? {
         val keyStore = KeyStore.getInstance(keyStoreProvider).apply { load(null) }
-        val existing = (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.secretKey
-        if (existing != null) return existing
+        return (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.secretKey
+    }
+
+    private fun getOrCreateKey(): SecretKey {
+        getExistingKey()?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, keyStoreProvider)
         val builder = KeyGenParameterSpec.Builder(

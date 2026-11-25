@@ -3,9 +3,11 @@ package com.example.passwordvault.ui.credential.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.passwordvault.R
+import com.example.passwordvault.core.clipboard.ClipboardHelper
+import com.example.passwordvault.core.crypto.TotpGenerator
+import com.example.passwordvault.core.preferences.AppPreferences
 import com.example.passwordvault.core.ui.UiText
 import com.example.passwordvault.domain.model.CredentialInput
-import com.example.passwordvault.domain.model.CredentialRecord
 import com.example.passwordvault.domain.model.FolderSummary
 import com.example.passwordvault.domain.model.PasswordGeneratorOptions
 import com.example.passwordvault.domain.model.PasswordStrengthScore
@@ -15,8 +17,8 @@ import com.example.passwordvault.domain.usecase.GeneratePasswordUseCase
 import com.example.passwordvault.domain.usecase.SaveCredentialUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -29,8 +31,12 @@ data class CredentialEditorUiState(
     val url: String = "",
     val login: String = "",
     val password: String = "",
+    val notes: String = "",
+    val totpSecret: String = "",
+    val isFavorite: Boolean = false,
     val folders: List<FolderSummary> = emptyList(),
     val strength: PasswordStrengthScore? = null,
+    val isTotpValid: Boolean = true,
     val isLoading: Boolean = true,
 )
 
@@ -41,6 +47,8 @@ class CredentialEditorViewModel(
     private val saveCredentialUseCase: SaveCredentialUseCase,
     private val generatePasswordUseCase: GeneratePasswordUseCase,
     private val evaluatePasswordUseCase: EvaluatePasswordUseCase,
+    private val appPreferences: AppPreferences,
+    private val clipboardHelper: ClipboardHelper,
 ) : ViewModel() {
     private val editorState = MutableStateFlow(
         CredentialEditorUiState(
@@ -49,6 +57,8 @@ class CredentialEditorViewModel(
             strength = evaluatePasswordUseCase(""),
         ),
     )
+
+    val generatorOptions: StateFlow<PasswordGeneratorOptions> = appPreferences.generatorOptions
 
     private var existingCredentialLoaded = false
 
@@ -65,6 +75,9 @@ class CredentialEditorViewModel(
                             url = credential.url.orEmpty(),
                             login = credential.login,
                             password = credential.password,
+                            notes = credential.notes.orEmpty(),
+                            totpSecret = credential.totpSecret.orEmpty(),
+                            isFavorite = credential.isFavorite,
                             strength = evaluatePasswordUseCase(credential.password),
                             isLoading = false,
                         )
@@ -80,9 +93,11 @@ class CredentialEditorViewModel(
         editorState,
         vaultRepository.observeFolders(),
     ) { state, folders ->
+        val totpValid = state.totpSecret.isBlank() || TotpGenerator.isValidInput(state.totpSecret)
         state.copy(
-            folders = folders,
+            folders = folders.sortedBy { it.name.lowercase() },
             strength = evaluatePasswordUseCase(state.password),
+            isTotpValid = totpValid,
             isLoading = false,
         )
     }.stateIn(
@@ -111,16 +126,37 @@ class CredentialEditorViewModel(
         editorState.value = editorState.value.copy(password = value)
     }
 
+    fun updateNotes(value: String) {
+        editorState.value = editorState.value.copy(notes = value)
+    }
+
+    fun updateTotpSecret(value: String) {
+        editorState.value = editorState.value.copy(totpSecret = value)
+    }
+
+    fun updateFavorite(value: Boolean) {
+        editorState.value = editorState.value.copy(isFavorite = value)
+    }
+
     fun updateFolder(folderId: Long?) {
         editorState.value = editorState.value.copy(folderId = folderId)
     }
 
-    fun applyGeneratedPassword(options: PasswordGeneratorOptions): String {
-        return generatePasswordUseCase(options)
+    fun saveGeneratorOptions(options: PasswordGeneratorOptions) {
+        appPreferences.setGeneratorOptions(options)
     }
 
-    fun evaluatePassword(password: String): PasswordStrengthScore {
-        return evaluatePasswordUseCase(password)
+    fun applyGeneratedPassword(options: PasswordGeneratorOptions): String =
+        generatePasswordUseCase(options)
+
+    fun evaluatePassword(password: String): PasswordStrengthScore =
+        evaluatePasswordUseCase(password)
+
+    fun copyGeneratedPassword(password: String, label: String) {
+        viewModelScope.launch {
+            clipboardHelper.copy(label = label, value = password, isSensitive = true)
+            messages.emit(UiText.StringResource(R.string.password_copied))
+        }
     }
 
     fun save() {
@@ -130,6 +166,10 @@ class CredentialEditorViewModel(
                 require(current.title.isNotBlank()) { "Title is required." }
                 require(current.login.isNotBlank()) { "Login is required." }
                 require(current.password.isNotBlank()) { "Password is required." }
+                val trimmedTotp = current.totpSecret.trim().takeIf { it.isNotBlank() }
+                if (trimmedTotp != null) {
+                    require(TotpGenerator.isValidInput(trimmedTotp)) { "Invalid TOTP secret." }
+                }
                 saveCredentialUseCase(
                     CredentialInput(
                         id = current.credentialId,
@@ -138,6 +178,9 @@ class CredentialEditorViewModel(
                         url = current.url.takeIf { it.isNotBlank() },
                         login = current.login,
                         password = current.password,
+                        notes = current.notes.takeIf { it.isNotBlank() },
+                        totpSecret = trimmedTotp,
+                        isFavorite = current.isFavorite,
                     ),
                 )
             }.onSuccess {
@@ -148,6 +191,7 @@ class CredentialEditorViewModel(
                     "Title is required." -> R.string.title_required
                     "Login is required." -> R.string.login_required
                     "Password is required." -> R.string.password_required
+                    "Invalid TOTP secret." -> R.string.totp_invalid_secret
                     else -> R.string.credential_save_failed
                 }
                 messages.emit(UiText.StringResource(resId))

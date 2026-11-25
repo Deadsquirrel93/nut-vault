@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +37,8 @@ import com.example.passwordvault.ui.credential.editor.CredentialEditorScreen
 import com.example.passwordvault.ui.credential.editor.CredentialEditorViewModel
 import com.example.passwordvault.ui.folder.FolderScreen
 import com.example.passwordvault.ui.folder.FolderViewModel
+import com.example.passwordvault.ui.health.PasswordHealthScreen
+import com.example.passwordvault.ui.health.PasswordHealthViewModel
 import com.example.passwordvault.ui.home.HomeScreen
 import com.example.passwordvault.ui.home.HomeViewModel
 import com.example.passwordvault.ui.login.LoginScreen
@@ -60,8 +63,10 @@ fun AppRoot(
     val activity = context.findActivity()
 
     if (appState.isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         }
         return
     }
@@ -89,6 +94,7 @@ fun AppRoot(
                         verifyLoginUseCase = container.verifyLoginUseCase,
                         sessionManager = container.sessionManager,
                         authRepository = container.authRepository,
+                        biometricCipherProvider = container.biometricCipherProvider,
                     )
                 }
             },
@@ -109,6 +115,12 @@ fun AppRoot(
                         HomeViewModel(
                             vaultRepository = container.vaultRepository,
                             saveFolderUseCase = container.saveFolderUseCase,
+                            sessionManager = container.sessionManager,
+                            clipboardHelper = container.clipboardHelper,
+                            appPreferences = container.appPreferences,
+                            passwordHealthAnalyzer = container.passwordHealthAnalyzer,
+                            generatePasswordUseCase = container.generatePasswordUseCase,
+                            evaluatePasswordUseCase = container.evaluatePasswordUseCase,
                         )
                     }
                 },
@@ -118,7 +130,26 @@ fun AppRoot(
                 onOpenFolder = { navController.navigate(Routes.folder(it)) },
                 onOpenCredential = { navController.navigate(Routes.credential(it)) },
                 onCreateCredential = { navController.navigate(Routes.createCredential()) },
+                onOpenHealth = { navController.navigate(Routes.health) },
                 onOpenSettings = { navController.navigate(Routes.settings) },
+            )
+        }
+
+        composable(Routes.health) {
+            val vm: PasswordHealthViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer {
+                        PasswordHealthViewModel(
+                            vaultRepository = container.vaultRepository,
+                            analyzer = container.passwordHealthAnalyzer,
+                        )
+                    }
+                },
+            )
+            PasswordHealthScreen(
+                viewModel = vm,
+                onBack = { navController.navigateUp() },
+                onOpenCredential = { navController.navigate(Routes.credential(it)) },
             )
         }
 
@@ -135,6 +166,8 @@ fun AppRoot(
                             importVaultUseCase = container.importVaultUseCase,
                             sessionManager = container.sessionManager,
                             localeManager = container.localeManager,
+                            appPreferences = container.appPreferences,
+                            biometricCipherProvider = container.biometricCipherProvider,
                         )
                     }
                 },
@@ -158,6 +191,7 @@ fun AppRoot(
                             folderId = folderId,
                             vaultRepository = container.vaultRepository,
                             saveFolderUseCase = container.saveFolderUseCase,
+                            clipboardHelper = container.clipboardHelper,
                         )
                     }
                 },
@@ -181,6 +215,8 @@ fun AppRoot(
                         CredentialDetailViewModel(
                             credentialId = credentialId,
                             vaultRepository = container.vaultRepository,
+                            clipboardHelper = container.clipboardHelper,
+                            evaluatePasswordUseCase = container.evaluatePasswordUseCase,
                         )
                     }
                 },
@@ -191,6 +227,7 @@ fun AppRoot(
                 onEdit = { id, folderId ->
                     navController.navigate(Routes.editCredential(id, folderId))
                 },
+                onOpenFolder = { navController.navigate(Routes.folder(it)) },
             )
         }
 
@@ -219,6 +256,8 @@ fun AppRoot(
                             saveCredentialUseCase = container.saveCredentialUseCase,
                             generatePasswordUseCase = container.generatePasswordUseCase,
                             evaluatePasswordUseCase = container.evaluatePasswordUseCase,
+                            appPreferences = container.appPreferences,
+                            clipboardHelper = container.clipboardHelper,
                         )
                     }
                 },
@@ -254,18 +293,26 @@ fun AppRoot(
                 TextButton(
                     onClick = {
                         val cipher = container.biometricCipherProvider.createEncryptionCipher()
+                            .getOrElse {
+                                appViewModel.dismissBiometricEnrollmentOffer()
+                                return@TextButton
+                            }
                         val prompt = BiometricPrompt(
-                            requireNotNull(activity),
+                            activity,
                             ContextCompat.getMainExecutor(context),
                             object : BiometricPrompt.AuthenticationCallback() {
                                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                                     val finalCipher = result.cryptoObject?.cipher ?: return
-                                    val ciphertext = Base64.encodeToString(
-                                        finalCipher.doFinal(container.biometricCipherProvider.verifierPlaintext()),
-                                        Base64.NO_WRAP,
-                                    )
-                                    val iv = Base64.encodeToString(finalCipher.iv, Base64.NO_WRAP)
-                                    appViewModel.enableBiometric(iv, ciphertext)
+                                    runCatching {
+                                        val ciphertext = Base64.encodeToString(
+                                            finalCipher.doFinal(container.biometricCipherProvider.verifierPlaintext()),
+                                            Base64.NO_WRAP,
+                                        )
+                                        val iv = Base64.encodeToString(finalCipher.iv, Base64.NO_WRAP)
+                                        appViewModel.enableBiometric(iv, ciphertext)
+                                    }.onFailure {
+                                        appViewModel.dismissBiometricEnrollmentOffer()
+                                    }
                                 }
 
                                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {

@@ -5,19 +5,22 @@ import androidx.room.Room
 import com.example.passwordvault.core.auth.BiometricCipherProvider
 import com.example.passwordvault.core.auth.PasswordHasher
 import com.example.passwordvault.core.auth.SessionManager
+import com.example.passwordvault.core.clipboard.ClipboardHelper
 import com.example.passwordvault.core.crypto.DeviceCryptoManager
 import com.example.passwordvault.core.crypto.VaultFileCodec
 import com.example.passwordvault.core.localization.LocaleManager
 import com.example.passwordvault.core.password.PasswordGenerator
+import com.example.passwordvault.core.password.PasswordHealthAnalyzer
 import com.example.passwordvault.core.password.PasswordStrengthEvaluator
+import com.example.passwordvault.core.preferences.AppPreferences
 import com.example.passwordvault.data.local.AppDatabase
 import com.example.passwordvault.data.local.AuthRepositoryImpl
 import com.example.passwordvault.data.local.VaultRepositoryImpl
 import com.example.passwordvault.data.local.VaultTransferManager
 import com.example.passwordvault.domain.repository.AuthRepository
 import com.example.passwordvault.domain.repository.VaultRepository
-import com.example.passwordvault.domain.usecase.EnableProtectionUseCase
 import com.example.passwordvault.domain.usecase.ChangeMasterPasswordUseCase
+import com.example.passwordvault.domain.usecase.EnableProtectionUseCase
 import com.example.passwordvault.domain.usecase.EvaluatePasswordUseCase
 import com.example.passwordvault.domain.usecase.ExportVaultUseCase
 import com.example.passwordvault.domain.usecase.GeneratePasswordUseCase
@@ -36,15 +39,20 @@ class AppContainer(context: Context) {
         context,
         AppDatabase::class.java,
         "password-vault.db",
-    ).build()
+    )
+        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .build()
 
     val deviceCryptoManager = DeviceCryptoManager()
     val passwordHasher = PasswordHasher()
     val passwordGenerator = PasswordGenerator()
     val passwordStrengthEvaluator = PasswordStrengthEvaluator()
+    val passwordHealthAnalyzer = PasswordHealthAnalyzer(passwordStrengthEvaluator)
     val biometricCipherProvider = BiometricCipherProvider()
     val sessionManager = SessionManager()
     val localeManager = LocaleManager(context)
+    val appPreferences = AppPreferences(context)
+    val clipboardHelper = ClipboardHelper(context, applicationScope)
 
     val vaultRepository: VaultRepository = VaultRepositoryImpl(
         database = appDatabase,

@@ -83,6 +83,9 @@ interface CredentialDao {
     @Update
     suspend fun update(credential: CredentialEntity)
 
+    @Query("UPDATE credentials SET isFavorite = :isFavorite, updatedAt = :updatedAt WHERE id = :credentialId")
+    suspend fun setFavorite(credentialId: Long, isFavorite: Boolean, updatedAt: Long)
+
     @Query("DELETE FROM credentials WHERE id = :credentialId")
     suspend fun deleteById(credentialId: Long)
 

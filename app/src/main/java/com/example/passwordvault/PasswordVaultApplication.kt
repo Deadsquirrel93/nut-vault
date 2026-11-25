@@ -20,9 +20,15 @@ class PasswordVaultApplication : Application() {
                 override fun onStop(owner: LifecycleOwner) {
                     container.applicationScope.launch {
                         if (container.authRepository.getSettings().protectionEnabled) {
-                            container.sessionManager.lock()
+                            val timeoutMs = container.appPreferences.autoLockTimeout.value.durationMillis
+                            container.sessionManager.onAppBackgrounded(timeoutMs, container.applicationScope)
                         }
                     }
+                }
+
+                override fun onStart(owner: LifecycleOwner) {
+                    val timeoutMs = container.appPreferences.autoLockTimeout.value.durationMillis
+                    container.sessionManager.onAppForegrounded(timeoutMs)
                 }
             },
         )

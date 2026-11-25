@@ -3,6 +3,7 @@ package com.example.passwordvault.ui.navigation
 object Routes {
     const val home = "home"
     const val settings = "settings"
+    const val health = "health"
     const val folder = "folder/{folderId}"
     const val credential = "credential/{credentialId}"
     const val editor = "editor?credentialId={credentialId}&folderId={folderId}"

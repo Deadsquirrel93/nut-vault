@@ -1,6 +1,7 @@
 package com.example.passwordvault.core.crypto
 
-import android.net.Uri
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.example.passwordvault.domain.model.ExportCredential
 import com.example.passwordvault.domain.model.ExportFolder
@@ -16,8 +17,7 @@ import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
+import javax.crypto.spec.SecretKeySpec
 
 data class PackedCipherText(
     val ivBase64: String,
@@ -35,6 +35,7 @@ data class PackedCipherText(
 }
 
 class DeviceCryptoManager {
+    // Keep alias unchanged so existing encrypted credentials remain decryptable after app updates.
     private val keyAlias = "password_vault_local_key"
     private val keyStoreProvider = "AndroidKeyStore"
 
@@ -108,6 +109,9 @@ class VaultFileCodec(
                         put("url", credential.url)
                         put("login", credential.login)
                         put("password", credential.password)
+                        put("notes", credential.notes)
+                        put("totpSecret", credential.totpSecret)
+                        put("isFavorite", credential.isFavorite)
                         put("createdAt", credential.createdAt)
                         put("updatedAt", credential.updatedAt)
                     })
@@ -123,6 +127,7 @@ class VaultFileCodec(
         cipher.init(Cipher.ENCRYPT_MODE, secret, GCMParameterSpec(128, iv))
         val encrypted = cipher.doFinal(snapshotJson)
 
+        // Keep version = 1 with optional extra fields so v1 backups remain bidirectional-compatible.
         val envelope = JSONObject().apply {
             put("version", 1)
             put("kdf", JSONObject().apply {
@@ -141,7 +146,8 @@ class VaultFileCodec(
 
     fun decode(raw: ByteArray, passphrase: String): VaultSnapshot {
         val envelope = JSONObject(raw.toString(StandardCharsets.UTF_8))
-        require(envelope.optInt("version") == 1) { "Unsupported vault version." }
+        val version = envelope.optInt("version")
+        require(version == 1 || version == 2) { "Unsupported vault version." }
 
         val kdf = envelope.getJSONObject("kdf")
         val iterations = kdf.getInt("iterations")
@@ -163,7 +169,7 @@ class VaultFileCodec(
     private fun deriveSecretKey(passphrase: String, salt: ByteArray, iterations: Int): SecretKey {
         val spec = PBEKeySpec(passphrase.toCharArray(), salt, iterations, 256)
         val secret = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
-        return javax.crypto.spec.SecretKeySpec(secret, "AES")
+        return SecretKeySpec(secret, "AES")
     }
 
     private fun JSONArray.toFolders(): List<ExportFolder> = buildList {
@@ -188,9 +194,12 @@ class VaultFileCodec(
                     externalId = item.getLong("id"),
                     folderExternalId = item.optLong("folderId").takeIf { !item.isNull("folderId") },
                     title = item.getString("title"),
-                    url = item.optString("url").takeIf { !item.isNull("url") },
+                    url = item.optString("url").takeIf { !item.isNull("url") && it.isNotBlank() },
                     login = item.getString("login"),
                     password = item.getString("password"),
+                    notes = item.optString("notes").takeIf { !item.isNull("notes") && it.isNotBlank() },
+                    totpSecret = item.optString("totpSecret").takeIf { !item.isNull("totpSecret") && it.isNotBlank() },
+                    isFavorite = item.optBoolean("isFavorite", false),
                     createdAt = item.getLong("createdAt"),
                     updatedAt = item.getLong("updatedAt"),
                 ),

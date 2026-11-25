@@ -1,5 +1,6 @@
 package com.example.passwordvault.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -32,6 +33,10 @@ data class CredentialEntity(
     val encryptedUrl: String?,
     val encryptedLogin: String,
     val encryptedPassword: String,
+    val encryptedNotes: String? = null,
+    val encryptedTotpSecret: String? = null,
+    @ColumnInfo(defaultValue = "0")
+    val isFavorite: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 )

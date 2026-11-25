@@ -4,8 +4,10 @@ import android.net.Uri
 import com.example.passwordvault.core.password.PasswordGenerator
 import com.example.passwordvault.core.password.PasswordStrengthEvaluator
 import com.example.passwordvault.data.local.VaultTransferManager
-import com.example.passwordvault.domain.model.CredentialInput
 import com.example.passwordvault.domain.model.ChangePasswordResult
+import com.example.passwordvault.domain.model.CredentialInput
+import com.example.passwordvault.domain.model.ImportMode
+import com.example.passwordvault.domain.model.ImportSummary
 import com.example.passwordvault.domain.model.LoginResult
 import com.example.passwordvault.domain.model.PasswordGeneratorOptions
 import com.example.passwordvault.domain.model.PasswordStrengthScore
@@ -70,7 +72,6 @@ class ExportVaultUseCase(
 class ImportVaultUseCase(
     private val vaultTransferManager: VaultTransferManager,
 ) {
-    suspend operator fun invoke(uri: Uri, passphrase: String) {
-        vaultTransferManager.importFrom(uri, passphrase)
-    }
+    suspend operator fun invoke(uri: Uri, passphrase: String, mode: ImportMode): ImportSummary =
+        vaultTransferManager.importFrom(uri, passphrase, mode)
 }
